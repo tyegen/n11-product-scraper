@@ -1,12 +1,12 @@
 # Specify the parent image from which we build
-FROM apify/actor-node-playwright:18
+FROM apify/actor-node-playwright:20
 
 # Copy just package.json and package-lock.json
 # to speed up the build using Docker layer caching.
 COPY package*.json ./
 
 # Install all dependencies
-RUN npm install --include=dev \
+RUN npm ci --include=dev \
     && echo "npm install completed"
 
 # Copy the rest of the source code
