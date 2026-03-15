@@ -131,24 +131,31 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
         const domProducts = await page.evaluate(() => {
             // Find all columns or containers that wrap a product
             const items = Array.from(document.querySelectorAll('.column, li.column, .product-item, [data-productid]'));
-            
-            return items.map(el => {
+            const results: any[] = [];
+            const seenIds = new Set<string>();
+
+            for (const el of items) {
                 // n11 specific selectors
-                const titleEl = el.querySelector('.productName, h3.name, .title');
-                const priceEl = el.querySelector('.newPrice, .ins, .currentPrice');
-                const linkEl = el.querySelector('a.product-item') as HTMLAnchorElement || el.querySelector('a') as HTMLAnchorElement;
-                const imgEl = el.querySelector('.imgHolder img, .imageContainer img, img') as HTMLImageElement;
+                const titleEl = el.querySelector('.productName, h3.name, .title, .product-title');
+                const priceEl = el.querySelector('.newPrice, .ins, .currentPrice, .price');
+                const linkEl = (el.matches('a') ? el : el.querySelector('a')) as HTMLAnchorElement;
+                const imgEl = el.querySelector('img');
                 
-                if (!titleEl || !priceEl) return null;
+                if (!titleEl || !priceEl) continue;
                 
-                return {
+                const id = el.getAttribute('data-id') || el.getAttribute('data-productid') || (linkEl?.href?.match(/(\d+)(?:\?|$)/)?.[1]) || '';
+                if (!id || seenIds.has(id)) continue;
+                seenIds.add(id);
+
+                results.push({
                     title: titleEl.textContent?.trim() || '',
                     price: priceEl.textContent?.trim() || '',
                     url: linkEl?.href || '',
                     image: imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-original') || imgEl?.src || '',
-                    id: el.getAttribute('data-id') || el.getAttribute('data-productid') || (linkEl?.href?.match(/(\d+)(?:\?|$)/)?.[1]) || ''
-                };
-            }).filter(p => p && p.title && p.price);
+                    id: id
+                });
+            }
+            return results;
         });
 
         if (domProducts.length > 0) {
