@@ -15,8 +15,12 @@ async function fetchProductDetail(url: string, proxyUrl?: string): Promise<any |
             headers: {
                 'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Upgrade-Insecure-Requests': '1',
+                'sec-ch-ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+                'sec-ch-ua-platform': '"Windows"',
+                'Referer': 'https://www.n11.com/',
             },
         });
+        if (response.statusCode === 403) return null;
         if (response.statusCode !== 200) return null;
         
         const html = response.body;

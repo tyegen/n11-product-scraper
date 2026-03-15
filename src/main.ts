@@ -24,6 +24,11 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     // Use maxRequestsPerCrawl from input, or fallback to a sensible default
     maxRequestsPerCrawl,
+    maxRequestRetries: 5,
+    useSessionPool: true,
+    sessionPoolOptions: {
+        maxPoolSize: 20,
+    },
     requestHandler: router,
     requestHandlerTimeoutSecs: 60,
     browserPoolOptions: {
@@ -37,12 +42,26 @@ const crawler = new PlaywrightCrawler({
     },
     preNavigationHooks: [
         async ({ page, gotoOptions }) => {
+            // Random delay 1-3s
+            await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+
             await page.setExtraHTTPHeaders({
                 'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Upgrade-Insecure-Requests': '1',
+                'sec-ch-ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+                'sec-ch-ua-platform': '"Windows"',
             });
             if (gotoOptions) {
                 (gotoOptions as any).waitUntil = 'domcontentloaded';
+            }
+        },
+    ],
+    postNavigationHooks: [
+        async ({ response, session, log, request }) => {
+            if (response && response.status() === 403) {
+                log.warning(`[403] BLOCK detected for ${request.url}. Retiring session...`);
+                session?.retire();
+                throw new Error(`403 Forbidden: Proxy/Session blocked.`);
             }
         },
     ],
