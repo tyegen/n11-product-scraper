@@ -129,12 +129,15 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
         log.warning(`[CATEGORY] No products found in window objects for ${request.url}. Attempting DOM extraction...`);
         
         const domProducts = await page.evaluate(() => {
-            const items = Array.from(document.querySelectorAll('li.column, div.column, .product-container, [data-productid]'));
+            // Find all columns or containers that wrap a product
+            const items = Array.from(document.querySelectorAll('.column, li.column, .product-item, [data-productid]'));
+            
             return items.map(el => {
-                const titleEl = el.querySelector('.productName, h3, h2, .title');
-                const priceEl = el.querySelector('.newPrice, .price, .ins, .currentPrice');
-                const linkEl = el.querySelector('a') as HTMLAnchorElement;
-                const imgEl = el.querySelector('img');
+                // n11 specific selectors
+                const titleEl = el.querySelector('.productName, h3.name, .title');
+                const priceEl = el.querySelector('.newPrice, .ins, .currentPrice');
+                const linkEl = el.querySelector('a.product-item') as HTMLAnchorElement || el.querySelector('a') as HTMLAnchorElement;
+                const imgEl = el.querySelector('.imgHolder img, .imageContainer img, img') as HTMLImageElement;
                 
                 if (!titleEl || !priceEl) return null;
                 
@@ -143,7 +146,7 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
                     price: priceEl.textContent?.trim() || '',
                     url: linkEl?.href || '',
                     image: imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-original') || imgEl?.src || '',
-                    id: el.getAttribute('data-productid') || (linkEl?.href?.match(/(\d+)(?:\?|$)/)?.[1]) || ''
+                    id: el.getAttribute('data-id') || el.getAttribute('data-productid') || (linkEl?.href?.match(/(\d+)(?:\?|$)/)?.[1]) || ''
                 };
             }).filter(p => p && p.title && p.price);
         });
@@ -153,6 +156,7 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
             for (const p of domProducts) {
                 if (!p) continue;
                 if (currentCount >= maxItems) break;
+                
                 const data = {
                     thumbnail: p.image,
                     productId: p.id,
@@ -167,35 +171,22 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
                 log.info(`[PRODUCT] ✓ (DOM) ${data.title} | ${data.price}`);
             }
         } else {
-            // Check if there are items in the DOM even if we couldn't parse them
-            const domCount = await page.$$eval('a.product-item', (items) => items.length);
-            if (domCount === 0) {
-                log.error(`[CATEGORY] NO PRODUCTS FOUND ON PAGE (JSON or DOM): ${request.url}. Capturing debug info...`);
-                
-                // DEBUG: Save Screenshot and HTML
-                const timestamp = Date.now();
-                const screenshot = await page.screenshot().catch(() => null);
-                if (screenshot) await Actor.setValue(`DEBUG-CAT-SCREENSHOT-${timestamp}.png`, screenshot, { contentType: 'image/png' });
-                
-                const html = await page.content();
-                await Actor.setValue(`DEBUG-CAT-HTML-${timestamp}.html`, html, { contentType: 'text/html' });
-            } else {
-                log.warning(`[CATEGORY] Found ${domCount} items in DOM, but parsing failed. Falling back to detail enqueuing...`);
-            }
+            log.error(`[CATEGORY] NO PRODUCTS FOUND ON PAGE (JSON or DOM): ${request.url}. Capturing debug info...`);
+            
+            // DEBUG: Save Screenshot and HTML
+            const timestamp = Date.now();
+            const screenshot = await page.screenshot().catch(() => null);
+            if (screenshot) await Actor.setValue(`DEBUG-CAT-SCREENSHOT-${timestamp}.png`, screenshot, { contentType: 'image/png' });
+            
+            const html = await page.content();
+            await Actor.setValue(`DEBUG-CAT-HTML-${timestamp}.html`, html, { contentType: 'text/html' });
         }
     }
 
-    // STEP 2: Paginate and enqueue links if we need more
+    // STEP 2: Paginate ONLY if we need more. DO NOT ENQUEUE DETAILS.
     if (currentCount < maxItems) {
-        log.info(`[CATEGORY] Need more products (${currentCount}/${maxItems}). Enqueuing pagination and details...`);
+        log.info(`[CATEGORY] Need more products (${currentCount}/${maxItems}). Enqueuing pagination...`);
         
-        // Enqueue details for products not yet extracted (if any)
-        await enqueueLinks({
-            selector: 'a.product-item',
-            label: 'detail',
-            userData: request.userData,
-        });
-
         // Pagination
         await enqueueLinks({
             selector: '.pagination a, a.next',
@@ -205,7 +196,7 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
     }
 });
 
-// Handler for product detail pages
+// Handler for product detail pages (Maintained but not called from category)
 router.addHandler('detail', async ({ request, page, log }) => {
     log.info(`[PRODUCT] Extracting: ${request.url}`);
 
