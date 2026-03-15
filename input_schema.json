@@ -12,6 +12,20 @@
                 { "url": "https://www.n11.com/bilgisayar/dizustu-bilgisayar" }
             ]
         },
+        "maxItems": {
+            "title": "Max Items",
+            "type": "integer",
+            "description": "Maximum number of products to scrape.",
+            "default": 100,
+            "minimum": 1
+        },
+        "maxRequestsPerCrawl": {
+            "title": "Max Requests",
+            "type": "integer",
+            "description": "Maximum number of pages to visit (prevents infinite loops).",
+            "default": 50,
+            "minimum": 1
+        },
         "proxyConfiguration": {
             "title": "Proxy configuration",
             "type": "object",

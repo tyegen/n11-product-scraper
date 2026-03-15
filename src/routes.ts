@@ -32,22 +32,25 @@ router.addHandler('detail', async ({ request, page, log }) => {
     log.info(`[PRODUCT] Extracting: ${request.url}`);
 
     try {
-        await page.waitForLoadState('domcontentloaded');
-
-        // Extract product data from window.productModel
+        // Extract product data - check multiple possible locations
         const productData = await page.evaluate(() => {
             const w = window as any;
-            return w.productModel || null;
+            // Return the first one that has data
+            return w.productModel || w.__PRELOADED_STATE__ || w.productDetail || null;
         });
         
         if (!productData) {
-            log.warning(`[PRODUCT] No productModel data found for ${request.url}`);
+            log.warning(`[PRODUCT] No product data found in window for ${request.url}`);
             
-            // SAVE DEBUG HTML
+            // DEBUG: Save Screenshot and HTML
+            const timestamp = Date.now();
+            const screenshot = await page.screenshot();
+            await Actor.setValue(`DEBUG-SCREENSHOT-${timestamp}.png`, screenshot, { contentType: 'image/png' });
+            
             const html = await page.content();
-            await Actor.setValue(`DEBUG-${Date.now()}`, html, { contentType: 'text/html' });
-            log.info(`[PRODUCT] Saved debug HTML for ${request.url}`);
+            await Actor.setValue(`DEBUG-HTML-${timestamp}.html`, html, { contentType: 'text/html' });
             
+            log.info(`[PRODUCT] Saved debug data (screenshot and HTML) for ${request.url}`);
             return;
         }
 
