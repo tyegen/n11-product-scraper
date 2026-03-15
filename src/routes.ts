@@ -42,7 +42,12 @@ router.addHandler('detail', async ({ request, page, log }) => {
         
         if (!productData) {
             log.warning(`[PRODUCT] No productModel data found for ${request.url}`);
-            // Fallback to HTML extraction if needed, but the user expects JSON extraction
+            
+            // SAVE DEBUG HTML
+            const html = await page.content();
+            await Actor.setValue(`DEBUG-${Date.now()}`, html, { contentType: 'text/html' });
+            log.info(`[PRODUCT] Saved debug HTML for ${request.url}`);
+            
             return;
         }
 
