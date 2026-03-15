@@ -22,6 +22,7 @@ const proxyConfiguration = await Actor.createProxyConfiguration(proxyConfig);
 
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
+    // Use maxRequestsPerCrawl from input, or fallback to a sensible default
     maxRequestsPerCrawl,
     requestHandler: router,
     requestHandlerTimeoutSecs: 60,
@@ -41,12 +42,16 @@ const crawler = new PlaywrightCrawler({
                 'Upgrade-Insecure-Requests': '1',
             });
             if (gotoOptions) {
-                gotoOptions.waitUntil = 'domcontentloaded';
+                (gotoOptions as any).waitUntil = 'domcontentloaded';
             }
         },
     ],
 });
 
-await crawler.run(startUrls);
+console.log(`Starting crawl with maxItems: ${maxItems}, maxRequestsPerCrawl: ${maxRequestsPerCrawl}`);
+await crawler.run(startUrls.map((req: any) => ({
+    ...req,
+    userData: { maxItems, ...req.userData },
+})));
 
 await Actor.exit();

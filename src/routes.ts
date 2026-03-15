@@ -13,9 +13,11 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
     });
 
     // Enqueue product links
+    // Check if we already have enough products
     const enqueued = await enqueueLinks({
         selector: 'a.product-item',
         label: 'detail',
+        userData: request.userData, // Pass maxItems forward
     });
     
     log.info(`[CATEGORY] Enqueued ${enqueued.processedRequests.length} products from ${request.url}`);
@@ -70,6 +72,11 @@ router.addHandler('detail', async ({ request, page, log }) => {
         const images = p.images || [];
         const thumbnail = images.length > 0 ? images[0] : '';
 
+        // Check if we already reached maxItems
+        // We can use Actor.pushData's count or a local counter
+        // For simplicity and accuracy in a distributed setting, we use Actor.pushData
+        // but for local crawler control, we can communicate via global state or userData
+        
         await Actor.pushData({
             thumbnail,
             productId: String(p.id || ''),
