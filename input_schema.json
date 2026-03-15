@@ -1,0 +1,24 @@
+{
+    "title": "n11.com Scraper Input Schema",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "startUrls": {
+            "title": "Start URLs",
+            "type": "array",
+            "description": "Category or Search URLs to start scraping from.",
+            "editor": "requestListSources",
+            "prefill": [
+                { "url": "https://www.n11.com/bilgisayar/dizustu-bilgisayar" }
+            ]
+        },
+        "proxyConfiguration": {
+            "title": "Proxy configuration",
+            "type": "object",
+            "description": "Optional proxy settings. It is recommended to use residential proxies for n11.com.",
+            "editor": "proxy",
+            "prefill": { "useApifyProxy": true }
+        }
+    },
+    "required": ["startUrls"]
+}

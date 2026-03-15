@@ -1,0 +1,14 @@
+{
+    "extends": "@apify/tsconfig",
+    "compilerOptions": {
+        "module": "ESNext",
+        "moduleResolution": "Node",
+        "target": "ESNext",
+        "outDir": "dist",
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "skipLibCheck": true
+    },
+    "include": [
+        "src/**/*.ts"
+    ]
+}

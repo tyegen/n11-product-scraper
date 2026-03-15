@@ -1,0 +1,22 @@
+{
+	"name": "n11-scraper",
+	"version": "0.0.1",
+	"type": "module",
+	"description": "Scraper for n11.com category and product pages.",
+	"dependencies": {
+		"apify": "^3.1.10",
+		"crawlee": "^3.5.4",
+		"playwright": "*"
+	},
+	"devDependencies": {
+		"@apify/tsconfig": "^0.1.0",
+		"typescript": "^5.0.0"
+	},
+	"scripts": {
+		"start": "npm run build && node dist/main.js",
+		"build": "tsc",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "Antigravity",
+	"license": "ISC"
+}
