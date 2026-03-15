@@ -126,22 +126,61 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
             log.info(`[PRODUCT] ✓ ${data.brand} - ${data.title} | ${data.price}`);
         }
     } else {
-        log.warning(`[CATEGORY] No products found in window objects for ${request.url}. Checking for DOM items...`);
+        log.warning(`[CATEGORY] No products found in window objects for ${request.url}. Attempting DOM extraction...`);
         
-        // Check if there are items in the DOM even if window variables are missing
-        const domCount = await page.$$eval('a.product-item', (items) => items.length);
-        if (domCount === 0) {
-            log.error(`[CATEGORY] NO PRODUCTS FOUND ON PAGE: ${request.url}. Capturing debug info...`);
-            
-            // DEBUG: Save Screenshot and HTML
-            const timestamp = Date.now();
-            const screenshot = await page.screenshot().catch(() => null);
-            if (screenshot) await Actor.setValue(`DEBUG-CAT-SCREENSHOT-${timestamp}.png`, screenshot, { contentType: 'image/png' });
-            
-            const html = await page.content();
-            await Actor.setValue(`DEBUG-CAT-HTML-${timestamp}.html`, html, { contentType: 'text/html' });
+        const domProducts = await page.evaluate(() => {
+            const items = Array.from(document.querySelectorAll('li.column, div.column, .product-container, [data-productid]'));
+            return items.map(el => {
+                const titleEl = el.querySelector('.productName, h3, h2, .title');
+                const priceEl = el.querySelector('.newPrice, .price, .ins, .currentPrice');
+                const linkEl = el.querySelector('a') as HTMLAnchorElement;
+                const imgEl = el.querySelector('img');
+                
+                if (!titleEl || !priceEl) return null;
+                
+                return {
+                    title: titleEl.textContent?.trim() || '',
+                    price: priceEl.textContent?.trim() || '',
+                    url: linkEl?.href || '',
+                    image: imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-original') || imgEl?.src || '',
+                    id: el.getAttribute('data-productid') || (linkEl?.href?.match(/(\d+)(?:\?|$)/)?.[1]) || ''
+                };
+            }).filter(p => p && p.title && p.price);
+        });
+
+        if (domProducts.length > 0) {
+            log.info(`[CATEGORY] Successfully extracted ${domProducts.length} products from DOM.`);
+            for (const p of domProducts) {
+                if (currentCount >= maxItems) break;
+                const data = {
+                    thumbnail: p.image,
+                    productId: p.id,
+                    title: p.title,
+                    price: p.price,
+                    url: p.url,
+                    scrapedAt: new Date().toISOString(),
+                    source: 'DOM_LISTING'
+                };
+                await Actor.pushData(data);
+                currentCount++;
+                log.info(`[PRODUCT] ✓ (DOM) ${data.title} | ${data.price}`);
+            }
         } else {
-            log.info(`[CATEGORY] Found ${domCount} items in DOM, but JSON variables were empty. Enqueuing via detail handler...`);
+            // Check if there are items in the DOM even if we couldn't parse them
+            const domCount = await page.$$eval('a.product-item', (items) => items.length);
+            if (domCount === 0) {
+                log.error(`[CATEGORY] NO PRODUCTS FOUND ON PAGE (JSON or DOM): ${request.url}. Capturing debug info...`);
+                
+                // DEBUG: Save Screenshot and HTML
+                const timestamp = Date.now();
+                const screenshot = await page.screenshot().catch(() => null);
+                if (screenshot) await Actor.setValue(`DEBUG-CAT-SCREENSHOT-${timestamp}.png`, screenshot, { contentType: 'image/png' });
+                
+                const html = await page.content();
+                await Actor.setValue(`DEBUG-CAT-HTML-${timestamp}.html`, html, { contentType: 'text/html' });
+            } else {
+                log.warning(`[CATEGORY] Found ${domCount} items in DOM, but parsing failed. Falling back to detail enqueuing...`);
+            }
         }
     }
 
