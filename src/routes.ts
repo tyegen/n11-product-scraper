@@ -121,6 +121,24 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
             currentCount++;
             log.info(`[PRODUCT] ✓ ${data.brand} - ${data.title} | ${data.price}`);
         }
+    } else {
+        log.warning(`[CATEGORY] No products found in window objects for ${request.url}. Checking for DOM items...`);
+        
+        // Check if there are items in the DOM even if window variables are missing
+        const domCount = await page.$$eval('a.product-item', (items) => items.length);
+        if (domCount === 0) {
+            log.error(`[CATEGORY] NO PRODUCTS FOUND ON PAGE: ${request.url}. Capturing debug info...`);
+            
+            // DEBUG: Save Screenshot and HTML
+            const timestamp = Date.now();
+            const screenshot = await page.screenshot().catch(() => null);
+            if (screenshot) await Actor.setValue(`DEBUG-CAT-SCREENSHOT-${timestamp}.png`, screenshot, { contentType: 'image/png' });
+            
+            const html = await page.content();
+            await Actor.setValue(`DEBUG-CAT-HTML-${timestamp}.html`, html, { contentType: 'text/html' });
+        } else {
+            log.info(`[CATEGORY] Found ${domCount} items in DOM, but JSON variables were empty. Enqueuing via detail handler...`);
+        }
     }
 
     // STEP 2: Paginate and enqueue links if we need more
