@@ -151,6 +151,7 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
         if (domProducts.length > 0) {
             log.info(`[CATEGORY] Successfully extracted ${domProducts.length} products from DOM.`);
             for (const p of domProducts) {
+                if (!p) continue;
                 if (currentCount >= maxItems) break;
                 const data = {
                     thumbnail: p.image,
