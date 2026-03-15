@@ -72,7 +72,7 @@ function formatProduct(p: any, url: string) {
 router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
     log.info(`[CATEGORY] Processing ${request.url}`);
 
-    const { maxItems = 100 } = request.userData;
+    const { maxItems = 100 } = request.userData as any;
 
     // Wait for product layout to appear
     await page.waitForSelector('a.product-item', { timeout: 15000 }).catch(() => {
@@ -107,30 +107,40 @@ router.addDefaultHandler(async ({ request, page, enqueueLinks, log }) => {
         return { source: null, products: [] as any[] };
     });
 
+    let currentCount = 0;
     if (categoryData.products.length > 0) {
         log.info(`[CATEGORY] Found ${categoryData.products.length} products in window.${categoryData.source}. Extracting directly...`);
         
         for (const p of categoryData.products) {
+            if (currentCount >= maxItems) {
+                log.info(`[CATEGORY] Reached maxItems limit (${maxItems}) during listing extraction.`);
+                return;
+            }
             const data = formatProduct(p, request.url);
             await Actor.pushData(data);
+            currentCount++;
             log.info(`[PRODUCT] ✓ ${data.brand} - ${data.title} | ${data.price}`);
         }
-    } else {
-        log.info(`[CATEGORY] No product list in window state. Enqueuing product links for detail extraction...`);
-        // STEP 2: Fallback to enqueuing links if window state doesn't have list
+    }
+
+    // STEP 2: Paginate and enqueue links if we need more
+    if (currentCount < maxItems) {
+        log.info(`[CATEGORY] Need more products (${currentCount}/${maxItems}). Enqueuing pagination and details...`);
+        
+        // Enqueue details for products not yet extracted (if any)
         await enqueueLinks({
             selector: 'a.product-item',
             label: 'detail',
             userData: request.userData,
         });
-    }
 
-    // Pagination
-    await enqueueLinks({
-        selector: '.pagination a, a.next',
-        globs: ['https://www.n11.com/**?pg=*'],
-        userData: request.userData,
-    });
+        // Pagination
+        await enqueueLinks({
+            selector: '.pagination a, a.next',
+            globs: ['https://www.n11.com/**?pg=*'],
+            userData: request.userData,
+        });
+    }
 });
 
 // Handler for product detail pages
@@ -139,7 +149,7 @@ router.addHandler('detail', async ({ request, page, log }) => {
 
     try {
         // Greedy search for detail data
-        const productData = await page.evaluate(() => {
+        let productData = await page.evaluate(() => {
             const w = window as any;
             const data = w.productModel || w.__PRELOADED_STATE__ || w.productDetail || null;
             // Serialization Fix
@@ -147,7 +157,14 @@ router.addHandler('detail', async ({ request, page, log }) => {
         });
         
         if (!productData) {
-            log.warning(`[PRODUCT] No data found in window for ${request.url}. Capturing debug info...`);
+            log.info(`[PRODUCT] Variable missing in window for ${request.url}. Falling back to HTTP fetch...`);
+            
+            // Fallback to HTTP Fetch to save browser resources
+            productData = await fetchProductDetail(request.url);
+        }
+        
+        if (!productData) {
+            log.warning(`[PRODUCT] Failed to extract data for ${request.url}. Capturing debug info...`);
             
             // DEBUG: Save Screenshot and HTML
             const timestamp = Date.now();
